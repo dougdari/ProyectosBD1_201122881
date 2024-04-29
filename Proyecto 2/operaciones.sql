@@ -121,3 +121,171 @@ consultar_movs_cliente: BEGIN
 END //
 
 DELIMITER ;
+
+-- Consultar clientes por tipo de cuenta
+DELIMITER //
+
+CREATE PROCEDURE consultarTipoCuentas(IN codigo_param INT)
+BEGIN
+    DECLARE tipo_existente INT;
+    DECLARE tipo_nombre VARCHAR(250);
+    DECLARE tipo_cuenta_count INT;
+    
+    -- Verificar si el código existe en la tabla tipo_cuenta
+    SELECT COUNT(*) INTO tipo_existente FROM tipo_cuenta WHERE codigo = codigo_param;
+    
+    IF tipo_existente > 0 THEN
+        -- Obtener el nombre del tipo de cuenta
+        SELECT nombre INTO tipo_nombre FROM tipo_cuenta WHERE codigo = codigo_param;
+        
+        -- Obtener el conteo de clientes con ese tipo de cuenta
+        SELECT COUNT(DISTINCT id_cliente) INTO tipo_cuenta_count FROM cuenta WHERE tipo_cuenta = codigo_param;
+        
+        -- Mostrar resultados
+        SELECT codigo AS 'Codigo tipo cuenta', nombre AS 'Nombre cuenta', tipo_cuenta_count AS 'Cantidad de clientes'
+        FROM tipo_cuenta WHERE codigo = codigo_param;
+    ELSE
+        -- Mostrar mensaje de error
+        SELECT 'El tipo de cuenta con el código ', codigo_param, ' no existe.' AS 'Error';
+    END IF;
+    
+END //
+
+DELIMITER ;
+
+-- Consulta movimientos generales por rango de fechas
+
+
+
+
+
+
+DELIMITER //
+
+CREATE PROCEDURE consultarMovsGenFech(IN fecha_inicio VARCHAR(10), IN fecha_fin VARCHAR(10))
+BEGIN
+    -- Variables para manejar las fechas
+    DECLARE fecha_inicio_conv DATE;
+    DECLARE fecha_fin_conv DATE;
+    
+    -- Convertir las fechas al formato DATE de MySQL
+    SET fecha_inicio_conv = STR_TO_DATE(fecha_inicio, '%d/%m/%Y');
+    SET fecha_fin_conv = STR_TO_DATE(fecha_fin, '%d/%m/%Y');
+    
+    -- Mostrar los movimientos según el rango de fechas
+    SELECT 
+        t.id_transaccion AS 'Id transaccion',
+        tt.nombre AS 'Tipo transaccion',
+        CASE
+            WHEN t.id_tipo_transaccion = 1 THEN c.otros_detalles
+            WHEN t.id_tipo_transaccion = 2 THEN dep.otros_detalles
+            WHEN t.id_tipo_transaccion = 3 THEN deb.otros_detalles
+        END AS 'Tipo de servicio',
+        CASE
+            WHEN t.id_tipo_transaccion = 1 THEN c.importe_compra
+            WHEN t.id_tipo_transaccion = 2 THEN dep.monto
+            WHEN t.id_tipo_transaccion = 3 THEN deb.monto
+        END AS 'Monto',
+        cl.nombre AS 'Nombre cliente',
+        tc.nombre AS 'Tipo cuenta',
+        t.fecha AS 'Fecha',
+        t.otros_detalles AS 'Otros detalles'
+    FROM 
+        transaccion t
+        INNER JOIN tipo_transaccion tt ON t.id_tipo_transaccion = tt.id_tipo
+        INNER JOIN cuenta cu ON t.no_cuenta = cu.id_cuenta
+        INNER JOIN cliente cl ON cu.id_cliente = cl.id_cliente
+        INNER JOIN tipo_cuenta tc ON cu.tipo_cuenta = tc.codigo
+        LEFT JOIN compra c ON t.id_operacion = c.id_compra AND t.id_tipo_transaccion = 1
+        LEFT JOIN deposito dep ON t.id_operacion = dep.id_deposito AND t.id_tipo_transaccion = 2
+        LEFT JOIN debito deb ON t.id_operacion = deb.id_debito AND t.id_tipo_transaccion = 3
+    WHERE 
+        t.fecha BETWEEN fecha_inicio_conv AND fecha_fin_conv;
+    
+END //
+
+DELIMITER ;
+
+
+-- consulta movimiento por rango de fecha filtrado por cliente
+
+call consultarMovsFechClien(202401,'01/01/2020','01/01/2025');
+
+DELIMITER //
+
+CREATE PROCEDURE consultarMovsFechClien(IN id_cliente_param INT, IN fecha_inicio VARCHAR(10), IN fecha_fin VARCHAR(10))
+BEGIN
+    DECLARE cliente_existente INT;
+    DECLARE fecha_inicio_conv DATE;
+	DECLARE fecha_fin_conv DATE;
+    
+    -- Verificar si el cliente existe
+    SELECT COUNT(*) INTO cliente_existente FROM cliente WHERE id_cliente = id_cliente_param;
+    
+    IF cliente_existente > 0 THEN
+        -- Variables para manejar las fechas
+        
+        
+        -- Convertir las fechas al formato DATE de MySQL
+        SET fecha_inicio_conv = STR_TO_DATE(fecha_inicio, '%d/%m/%Y');
+        SET fecha_fin_conv = STR_TO_DATE(fecha_fin, '%d/%m/%Y');
+        
+        -- Mostrar los movimientos según el rango de fechas y el cliente
+        SELECT 
+            t.id_transaccion AS 'Id transaccion',
+            tt.nombre AS 'Tipo transaccion',
+            CASE
+                WHEN t.id_tipo_transaccion = 1 THEN c.otros_detalles
+                WHEN t.id_tipo_transaccion = 2 THEN dep.otros_detalles
+                WHEN t.id_tipo_transaccion = 3 THEN deb.otros_detalles
+            END AS 'Tipo de servicio',
+            CASE
+                WHEN t.id_tipo_transaccion = 1 THEN c.importe_compra
+                WHEN t.id_tipo_transaccion = 2 THEN dep.monto
+                WHEN t.id_tipo_transaccion = 3 THEN deb.monto
+            END AS 'Monto',
+            cl.nombre AS 'Nombre cliente',
+            tc.nombre AS 'Tipo cuenta',
+            t.fecha AS 'Fecha',
+            t.otros_detalles AS 'Otros detalles'
+        FROM 
+            transaccion t
+            INNER JOIN tipo_transaccion tt ON t.id_tipo_transaccion = tt.id_tipo
+            INNER JOIN cuenta cu ON t.no_cuenta = cu.id_cuenta
+            INNER JOIN cliente cl ON cu.id_cliente = cl.id_cliente
+            INNER JOIN tipo_cuenta tc ON cu.tipo_cuenta = tc.codigo
+            LEFT JOIN compra c ON t.id_operacion = c.id_compra AND t.id_tipo_transaccion = 1
+            LEFT JOIN deposito dep ON t.id_operacion = dep.id_deposito AND t.id_tipo_transaccion = 2
+            LEFT JOIN debito deb ON t.id_operacion = deb.id_debito AND t.id_tipo_transaccion = 3
+        WHERE 
+            cl.id_cliente = id_cliente_param AND
+            t.fecha BETWEEN fecha_inicio_conv AND fecha_fin_conv;
+    ELSE
+        -- Mostrar mensaje de error
+        SELECT 'El cliente con el ID ', id_cliente_param, ' no existe.' AS 'Error';
+    END IF;
+    
+END //
+
+DELIMITER ;
+
+
+-- productos --
+
+call consultarProductoServicio();
+
+DELIMITER //
+
+CREATE PROCEDURE consultarProductoServicio()
+BEGIN
+    -- Listar las columnas especificadas de la tabla productos_servicios
+    SELECT 
+        codigo AS 'Codigo de servicio / producto',
+        descripcion AS 'Nombre',
+        concat('Tipo ', tipo) AS 'Descripcion',
+        IF(tipo = 1, 'Servicio', 'Producto') AS 'Tipo'
+    FROM 
+        productos_servicios;
+END //
+
+DELIMITER ;
